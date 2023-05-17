@@ -1,0 +1,84 @@
+#define THRESHOLD 1000 // CHANGE YOUR THRESHOLD HERE
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
+#define APIKEY  "XBAD0pABc88nRh5p6NWnxGwLIr1PMYcS"
+#define DEVICE_DEV_ID "soil@lutfil2000" 
+
+int moisturePercentage;
+const int moisturePin = 33;
+const char* ssid = "UniKL MIIT";
+const char* password = "";
+long previousMillis = 0;
+int interval = 5000;
+
+void setup() {
+  Serial.begin(9600);
+  Serial.print("Connecting to ");
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+  delay(1000);
+  Serial.println("Connecting to WiFi…");
+  pinMode(27, OUTPUT);
+  }
+  Serial.println("Connected to WiFi");
+  
+}
+
+// the loop function runs over and over again forever
+void loop() {
+  //digitalWrite(27, HIGH); // turn the LED on
+  //delay(500);             // wait for 500 milliseconds
+  //digitalWrite(27, LOW);  // turn the LED off
+  //delay(500);             // wait for 500 milliseconds
+  
+  moisturePercentage = ( 100.00 - ( (analogRead(moisturePin) / 1023.00) * 100.00 ) );
+  Serial.print(moisturePercentage);
+  Serial.println("%");
+  favoriot();
+  if(moisturePercentage >= 50){
+    if(moisturePercentage <= 100){
+      digitalWrite(27, HIGH);
+      } else {
+        digitalWrite(27, LOW);
+      }
+  }
+  delay(500);
+
+
+}
+void favoriot(){  
+  StaticJsonDocument<200> doc;
+  JsonObject root = doc.to<JsonObject>(); // Json Object refer to { }
+    root["device_developer_id"] = DEVICE_DEV_ID;
+  
+    JsonObject data = root.createNestedObject("data");
+    data["moisturePercentage"] = (int)moisturePercentage;
+
+    
+    String body;
+    serializeJson(root, body);
+    Serial.println(body);
+  
+    HTTPClient http;
+    http.begin("http://apiv2.favoriot.com/v2/streams");
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("Apikey", APIKEY);
+    
+    int httpCode = http.POST(body);
+    if (httpCode > 0) {
+      Serial.printf("[HTTP] POST... code: %d\n", httpCode);
+      if (httpCode == HTTP_CODE_OK) {
+        String payload = http.getString();
+        Serial.println(payload);
+      }
+    }
+    else {
+      Serial.printf("[HTTP] POST... failed, error: %s\n", http.errorToString(httpCode).c_str());
+    }
+    http.end();
+
+    previousMillis = millis();
+    delay(10000);
+}
